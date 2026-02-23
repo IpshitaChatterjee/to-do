@@ -92,6 +92,27 @@
       cursor: default;
     }
 
+    .today-btn {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: none;
+      border: 1px solid var(--border-mid);
+      border-radius: 3px;
+      padding: 0.2em 0.55em;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+      display: none;
+      align-items: center;
+    }
+    .today-btn:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
     /* ── Grid ────────────────────────────────────────────────── */
 
     .week-grid {
@@ -404,6 +425,7 @@
     <button class="nav-btn" id="nextBtn" aria-label="Next week">
       <svg width="7" height="11" viewBox="0 0 7 11" fill="none" aria-hidden="true"><path d="M1 1L5.5 5.5L1 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+    <button class="today-btn" id="todayBtn" aria-label="Go to current week">Today</button>
   </div>
 </header>
 
@@ -432,6 +454,7 @@
 
   document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
   document.getElementById('nextBtn').addEventListener('click', () => navigate(+1));
+  document.getElementById('todayBtn').addEventListener('click', () => navigate(-weekOffset));
 
   // ── Dates ─────────────────────────────────────────────────────
   function getWeekDates(offset) {
@@ -545,6 +568,7 @@
 
   function updateNavButtons() {
     document.getElementById('prevBtn').disabled = weekOffset === 0;
+    document.getElementById('todayBtn').style.display = weekOffset > 0 ? 'inline-flex' : 'none';
   }
 
   function uid() {
