@@ -238,6 +238,7 @@
       border-radius: 3px;
       padding: 0.05em 0.2em;
       margin: -0.05em -0.2em;
+      cursor: text;
     }
 
     .task-text[contenteditable="true"] {
@@ -555,21 +556,20 @@
 
     const textEl = el('div', 'task-text' + (task.done ? ' is-done' : ''));
     textEl.textContent = task.text;
-    textEl.addEventListener('dblclick', () => beginEdit(textEl, task, di));
+    textEl.addEventListener('click', () => {
+      if (textEl.contentEditable === 'true') return;
+      beginEdit(textEl, task, di);
+    });
 
     const actions = el('div', 'task-actions');
 
     const doneBtn = mkBtn('t-btn btn-done' + (task.done ? ' done-active' : ''), icoCheck(), task.done ? 'Mark undone' : 'Mark done');
     doneBtn.addEventListener('click', () => toggleDone(task.id, di));
 
-    const editBtn = mkBtn('t-btn btn-edit', icoPen(), 'Edit');
-    editBtn.addEventListener('click', () => beginEdit(textEl, task, di));
-
     const delBtn = mkBtn('t-btn btn-del', icoX(), 'Delete');
     delBtn.addEventListener('click', () => deleteTask(task.id, di, item));
 
     actions.appendChild(doneBtn);
-    actions.appendChild(editBtn);
     actions.appendChild(delBtn);
 
     item.appendChild(grip);
@@ -766,9 +766,6 @@
   }
   function icoCheck() {
     return `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M2 5.5L4.5 8L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  }
-  function icoPen() {
-    return `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M1.5 9.5L3.5 7.5L8.5 2.5L8.5 2.5L8 2L3 7L1.5 9.5Z" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2L9 4" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>`;
   }
   function icoX() {
     return `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
