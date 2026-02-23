@@ -90,13 +90,17 @@
       background: var(--today-bg);
     }
 
-    /* accent stripe on today */
-    .day-col.is-today::before {
+    /* accent stripe — all columns reserve the same 2px so headers stay aligned */
+    .day-col::before {
       content: '';
       display: block;
       height: 2px;
-      background: var(--accent);
+      background: transparent;
       flex-shrink: 0;
+    }
+
+    .day-col.is-today::before {
+      background: var(--accent);
     }
 
     .day-col.drop-active {
