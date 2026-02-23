@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Week Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Plus+Jakarta+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           oklch(97% 0.012 78);
+      --col-bg:       oklch(99% 0.005 78);
+      --today-bg:     oklch(94.5% 0.022 68);
+      --accent:       oklch(57% 0.13 52);
+      --text:         oklch(17% 0.014 250);
+      --text-muted:   oklch(52% 0.014 250);
+      --text-faint:   oklch(68% 0.010 250);
+      --border:       oklch(90.5% 0.011 78);
+      --border-mid:   oklch(84% 0.016 78);
+      --delete:       oklch(50% 0.15 22);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      overflow: hidden;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+
+    .app-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.875rem;
+      padding: 1.5rem 2rem 1.125rem;
+      flex-shrink: 0;
+    }
+
+    .app-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      font-weight: 400;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .week-range {
+      font-size: 0.7rem;
+      font-weight: 300;
+      color: var(--text-muted);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    /* ── Grid ────────────────────────────────────────────────── */
+
+    .week-grid {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* ── Day Column ──────────────────────────────────────────── */
+
+    .day-col {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--col-bg);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .day-col:last-child { border-right: none; }
+
+    .day-col.is-today {
+      background: var(--today-bg);
+    }
+
+    /* accent stripe on today */
+    .day-col.is-today::before {
+      content: '';
+      display: block;
+      height: 2px;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .day-col.drop-active {
+      background: color-mix(in srgb, var(--accent) 7%, var(--today-bg));
+    }
+
+    /* ── Day Header ──────────────────────────────────────────── */
+
+    .day-header {
+      padding: 1rem 1rem 0.875rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .day-name-row {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .day-name {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(0.82rem, 1.05vw, 0.98rem);
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .is-today .day-name { color: var(--accent); }
+
+    .day-badge {
+      font-size: 0.6rem;
+      font-weight: 500;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--text-faint);
+      background: var(--border);
+      border-radius: 20px;
+      padding: 0.1em 0.45em;
+      line-height: 1.7;
+      letter-spacing: 0.02em;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .is-today .day-badge {
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      color: var(--accent);
+    }
+
+    .day-date {
+      font-size: 0.66rem;
+      font-weight: 300;
+      color: var(--text-faint);
+      letter-spacing: 0.02em;
+    }
+
+    .is-today .day-date {
+      color: color-mix(in srgb, var(--accent) 65%, var(--text-muted));
+    }
+
+    /* ── Task List ───────────────────────────────────────────── */
+
+    .task-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0.375rem 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .task-list::-webkit-scrollbar { width: 3px; }
+    .task-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .empty-hint {
+      padding: 1.125rem 1rem;
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 0.7rem;
+      color: var(--text-faint);
+      opacity: 0.55;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* ── Task Item ───────────────────────────────────────────── */
+
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.35rem;
+      padding: 0.33rem 0.875rem 0.33rem 0.7rem;
+      cursor: grab;
+      position: relative;
+      min-width: 0;
+      transition: background 0.1s;
+    }
+
+    .task-item:hover { background: color-mix(in srgb, var(--border) 38%, transparent); }
+    .task-item:active { cursor: grabbing; }
+    .task-item.is-dragging { opacity: 0.28; }
+
+    /* drop line indicators */
+    .task-item.drop-before::before,
+    .task-item.drop-after::after {
+      content: '';
+      position: absolute;
+      left: 0.5rem;
+      right: 0.5rem;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px;
+      pointer-events: none;
+    }
+    .task-item.drop-before::before { top: 0; }
+    .task-item.drop-after::after  { bottom: 0; }
+
+    .drag-grip {
+      flex-shrink: 0;
+      width: 10px;
+      margin-top: 3px;
+      color: var(--border);
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+    .task-item:hover .drag-grip { opacity: 1; }
+
+    .task-text {
+      flex: 1;
+      font-size: 0.77rem;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--text);
+      min-width: 0;
+      word-break: break-word;
+      outline: none;
+      border-radius: 3px;
+      padding: 0.05em 0.2em;
+      margin: -0.05em -0.2em;
+    }
+
+    .task-text[contenteditable="true"] {
+      background: color-mix(in srgb, var(--accent) 9%, var(--col-bg));
+      box-shadow: 0 0 0 1.5px var(--accent);
+      cursor: text;
+      user-select: text;
+    }
+
+    .task-text.is-done {
+      text-decoration: line-through;
+      color: var(--text-faint);
+      opacity: 0.5;
+    }
+
+    .task-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.12s;
+      margin-top: 1px;
+    }
+    .task-item:hover .task-actions { opacity: 1; }
+
+    .t-btn {
+      width: 18px;
+      height: 18px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 3px;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: background 0.1s, color 0.1s;
+      flex-shrink: 0;
+    }
+    .t-btn:hover { background: var(--border); color: var(--text); }
+    .t-btn.done-active { color: var(--accent); }
+    .t-btn.btn-done:hover {
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      color: var(--accent);
+    }
+    .t-btn.btn-del:hover {
+      background: color-mix(in srgb, var(--delete) 12%, transparent);
+      color: var(--delete);
+    }
+
+    /* ── Add Area ────────────────────────────────────────────── */
+
+    .add-area {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      padding: 0.6rem 0.875rem;
+    }
+
+    .add-form {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .add-input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      background: none;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.74rem;
+      font-weight: 300;
+      color: var(--text);
+      outline: none;
+      padding: 0;
+    }
+
+    .add-input::placeholder { color: var(--text-faint); opacity: 0.6; }
+    .add-input:focus::placeholder { opacity: 0.3; }
+
+    .add-btn {
+      width: 18px;
+      height: 18px;
+      border: 1px solid var(--border-mid);
+      background: none;
+      border-radius: 3px;
+      cursor: pointer;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+      transition: background 0.14s, border-color 0.14s, color 0.14s;
+    }
+    .add-btn:hover,
+    .add-input:focus ~ .add-btn {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: oklch(99% 0 0);
+    }
+    .is-today .add-btn {
+      border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+      color: color-mix(in srgb, var(--accent) 75%, var(--text-faint));
+    }
+
+    /* ── Animations ──────────────────────────────────────────── */
+
+    @keyframes taskEnter {
+      from { opacity: 0; transform: translateY(-5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .task-item.anim-enter {
+      animation: taskEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .task-item.anim-enter { animation: none; }
+    }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .week-grid { grid-template-columns: repeat(7, minmax(128px, 1fr)); overflow-x: auto; }
+      .app-header { padding: 1.25rem 1.25rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1 class="app-title">Week</h1>
+  <span class="week-range" id="weekRange"></span>
+</header>
+
+<div class="week-grid" id="weekGrid"></div>
+
+<script>
+  // ── Constants ─────────────────────────────────────────────────
+  const DAYS   = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // ── State ─────────────────────────────────────────────────────
+  let tasks     = loadTasks();
+  let dragState = null;
+  const weekDates = getWeekDates();
+
+  // ── Boot ──────────────────────────────────────────────────────
+  renderWeekRange();
+  renderGrid();
+
+  // ── Dates ─────────────────────────────────────────────────────
+  function getWeekDates() {
+    const today = new Date();
+    const dow   = today.getDay();
+    const diff  = dow === 0 ? -6 : 1 - dow;
+    const mon   = new Date(today);
+    mon.setDate(today.getDate() + diff);
+    mon.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      return d;
+    });
+  }
+
+  function isToday(d) {
+    const t = new Date();
+    return d.getDate() === t.getDate()
+        && d.getMonth() === t.getMonth()
+        && d.getFullYear() === t.getFullYear();
+  }
+
+  function renderWeekRange() {
+    const s = weekDates[0], e = weekDates[6];
+    const label = s.getMonth() === e.getMonth()
+      ? `${s.getDate()}–${e.getDate()} ${MONTHS[s.getMonth()]} ${e.getFullYear()}`
+      : `${s.getDate()} ${MONTHS[s.getMonth()]} – ${e.getDate()} ${MONTHS[e.getMonth()]} ${e.getFullYear()}`;
+    document.getElementById('weekRange').textContent = label;
+  }
+
+  // ── Storage ───────────────────────────────────────────────────
+  function loadTasks() {
+    try {
+      const raw = localStorage.getItem('weekplan-v1');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return Object.fromEntries(Array.from({ length: 7 }, (_, i) => [i, []]));
+  }
+
+  function saveTasks() {
+    localStorage.setItem('weekplan-v1', JSON.stringify(tasks));
+  }
+
+  function uid() {
+    return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+  function renderGrid() {
+    const grid = document.getElementById('weekGrid');
+    grid.innerHTML = '';
+    for (let i = 0; i < 7; i++) grid.appendChild(buildCol(i));
+  }
+
+  function buildCol(di) {
+    const date   = weekDates[di];
+    const today  = isToday(date);
+    const dtasks = tasks[di] || [];
+
+    const col = el('div', 'day-col' + (today ? ' is-today' : ''));
+    col.dataset.day = di;
+
+    // Header
+    const hdr     = el('div', 'day-header');
+    const nameRow = el('div', 'day-name-row');
+    const nameEl  = el('span', 'day-name');
+    nameEl.textContent = DAYS[di];
+    nameRow.appendChild(nameEl);
+
+    if (dtasks.length > 0) {
+      const badge = el('span', 'day-badge');
+      const pending = dtasks.filter(t => !t.done).length;
+      badge.textContent = pending > 0 ? pending : dtasks.length;
+      nameRow.appendChild(badge);
+    }
+
+    const dateEl = el('div', 'day-date');
+    dateEl.textContent = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+
+    hdr.appendChild(nameRow);
+    hdr.appendChild(dateEl);
+    col.appendChild(hdr);
+
+    // Task list
+    const list = el('div', 'task-list');
+    list.dataset.day = di;
+
+    if (dtasks.length === 0) {
+      list.appendChild(emptyHint(today));
+    } else {
+      dtasks.forEach((t, idx) => list.appendChild(buildItem(t, di, idx)));
+    }
+
+    // List-level drop (empty area)
+    list.addEventListener('dragover', e => {
+      if (!dragState) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (e.target === list || e.target.classList.contains('empty-hint')) {
+        clearIndicators();
+        col.classList.add('drop-active');
+      }
+    });
+    list.addEventListener('dragleave', e => {
+      if (!list.contains(e.relatedTarget)) col.classList.remove('drop-active');
+    });
+    list.addEventListener('drop', e => {
+      if (!dragState) return;
+      if (e.target === list || e.target.classList.contains('empty-hint')) {
+        e.preventDefault();
+        e.stopPropagation();
+        doMove(dragState.fromDay, dragState.fromIdx, di, (tasks[di] || []).length);
+        endDrag();
+      }
+    });
+
+    col.appendChild(list);
+
+    // Add area
+    const addArea = el('div', 'add-area');
+    const form    = el('div', 'add-form');
+    const input   = document.createElement('input');
+    input.type = 'text';
+    input.className = 'add-input';
+    input.placeholder = 'Add task…';
+    input.setAttribute('aria-label', `Add task to ${DAYS[di]}`);
+    input.autocomplete = 'off';
+
+    const btn = el('button', 'add-btn');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Add');
+    btn.innerHTML = icoPlus();
+
+    const doAdd = () => {
+      const text = input.value.trim();
+      if (!text) return;
+      addTask(di, text);
+      input.value = '';
+      input.focus();
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+    btn.addEventListener('click', doAdd);
+
+    form.appendChild(input);
+    form.appendChild(btn);
+    addArea.appendChild(form);
+    col.appendChild(addArea);
+
+    return col;
+  }
+
+  function buildItem(task, di, idx) {
+    const item = el('div', 'task-item');
+    item.draggable = true;
+    item.dataset.taskId = task.id;
+    item.dataset.day    = di;
+    item.dataset.index  = idx;
+
+    const grip = el('span', 'drag-grip');
+    grip.innerHTML = icoGrip();
+    grip.setAttribute('aria-hidden', 'true');
+
+    const textEl = el('div', 'task-text' + (task.done ? ' is-done' : ''));
+    textEl.textContent = task.text;
+    textEl.addEventListener('dblclick', () => beginEdit(textEl, task, di));
+
+    const actions = el('div', 'task-actions');
+
+    const doneBtn = mkBtn('t-btn btn-done' + (task.done ? ' done-active' : ''), icoCheck(), task.done ? 'Mark undone' : 'Mark done');
+    doneBtn.addEventListener('click', () => toggleDone(task.id, di));
+
+    const editBtn = mkBtn('t-btn btn-edit', icoPen(), 'Edit');
+    editBtn.addEventListener('click', () => beginEdit(textEl, task, di));
+
+    const delBtn = mkBtn('t-btn btn-del', icoX(), 'Delete');
+    delBtn.addEventListener('click', () => deleteTask(task.id, di, item));
+
+    actions.appendChild(doneBtn);
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+
+    item.appendChild(grip);
+    item.appendChild(textEl);
+    item.appendChild(actions);
+
+    // Drag events
+    item.addEventListener('dragstart', e => {
+      dragState = { taskId: task.id, fromDay: di, fromIdx: idx };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', task.id);
+      requestAnimationFrame(() => item.classList.add('is-dragging'));
+    });
+    item.addEventListener('dragend', () => endDrag());
+
+    item.addEventListener('dragover', e => {
+      if (!dragState) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      if (item.classList.contains('is-dragging')) return;
+      clearIndicators();
+      const mid = item.getBoundingClientRect().top + item.offsetHeight / 2;
+      item.classList.add(e.clientY < mid ? 'drop-before' : 'drop-after');
+    });
+    item.addEventListener('dragleave', e => {
+      if (!item.contains(e.relatedTarget)) item.classList.remove('drop-before', 'drop-after');
+    });
+    item.addEventListener('drop', e => {
+      if (!dragState) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const mid = item.getBoundingClientRect().top + item.offsetHeight / 2;
+      doMove(dragState.fromDay, dragState.fromIdx, di, e.clientY < mid ? idx : idx + 1);
+      endDrag();
+    });
+
+    return item;
+  }
+
+  // ── Task Ops ──────────────────────────────────────────────────
+  function addTask(di, text) {
+    if (!tasks[di]) tasks[di] = [];
+    const task = { id: uid(), text, done: false };
+    tasks[di].push(task);
+    saveTasks();
+
+    const list = document.querySelector(`.task-list[data-day="${di}"]`);
+    const hint = list.querySelector('.empty-hint');
+    if (hint) hint.remove();
+
+    const item = buildItem(task, di, tasks[di].length - 1);
+    item.classList.add('anim-enter');
+    item.addEventListener('animationend', () => item.classList.remove('anim-enter'), { once: true });
+    list.appendChild(item);
+    syncBadge(di);
+  }
+
+  function deleteTask(taskId, di, itemEl) {
+    // Animate collapse
+    const h = itemEl.offsetHeight;
+    itemEl.style.cssText = `height:${h}px; overflow:hidden; transition:height 0.2s ease, opacity 0.15s ease, padding-top 0.2s ease, padding-bottom 0.2s ease;`;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      itemEl.style.height        = '0';
+      itemEl.style.opacity       = '0';
+      itemEl.style.paddingTop    = '0';
+      itemEl.style.paddingBottom = '0';
+    }));
+    itemEl.addEventListener('transitionend', () => {
+      tasks[di] = tasks[di].filter(t => t.id !== taskId);
+      saveTasks();
+      itemEl.remove();
+      const list = document.querySelector(`.task-list[data-day="${di}"]`);
+      if (tasks[di].length === 0) list.appendChild(emptyHint(isToday(weekDates[di])));
+      syncBadge(di);
+      reindex(di);
+    }, { once: true });
+  }
+
+  function toggleDone(taskId, di) {
+    const t = tasks[di].find(t => t.id === taskId);
+    if (!t) return;
+    t.done = !t.done;
+    saveTasks();
+    const item = document.querySelector(`.task-item[data-task-id="${taskId}"]`);
+    if (item) {
+      item.querySelector('.task-text').classList.toggle('is-done', t.done);
+      const btn = item.querySelector('.btn-done');
+      btn.classList.toggle('done-active', t.done);
+      btn.setAttribute('aria-label', t.done ? 'Mark undone' : 'Mark done');
+    }
+    syncBadge(di);
+  }
+
+  function beginEdit(textEl, task, di) {
+    textEl.contentEditable = 'true';
+    textEl.focus();
+    const sel = window.getSelection(), range = document.createRange();
+    range.selectNodeContents(textEl);
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const finish = () => {
+      const val = textEl.textContent.trim();
+      textEl.contentEditable = 'false';
+      if (val) { task.text = val; saveTasks(); }
+      else textEl.textContent = task.text;
+    };
+    textEl.addEventListener('blur', finish, { once: true });
+    textEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); textEl.blur(); }
+      if (e.key === 'Escape') { textEl.textContent = task.text; textEl.contentEditable = 'false'; }
+    });
+  }
+
+  // ── Drag & Drop ───────────────────────────────────────────────
+  function doMove(fromDay, fromIdx, toDay, toIdx) {
+    if (fromDay === toDay && fromIdx === toIdx) return;
+    const [task] = tasks[fromDay].splice(fromIdx, 1);
+    if (!tasks[toDay]) tasks[toDay] = [];
+    let ti = toIdx;
+    if (fromDay === toDay && toIdx > fromIdx) ti--;
+    tasks[toDay].splice(ti, 0, task);
+    saveTasks();
+    refreshCol(fromDay);
+    if (toDay !== fromDay) refreshCol(toDay);
+  }
+
+  function endDrag() {
+    dragState = null;
+    document.querySelectorAll('.is-dragging').forEach(e => e.classList.remove('is-dragging'));
+    clearIndicators();
+    document.querySelectorAll('.drop-active').forEach(e => e.classList.remove('drop-active'));
+  }
+
+  function clearIndicators() {
+    document.querySelectorAll('.drop-before,.drop-after').forEach(e => e.classList.remove('drop-before','drop-after'));
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function refreshCol(di) {
+    const grid = document.getElementById('weekGrid');
+    const old  = document.querySelector(`.day-col[data-day="${di}"]`);
+    if (old) grid.replaceChild(buildCol(di), old);
+  }
+
+  function syncBadge(di) {
+    const col = document.querySelector(`.day-col[data-day="${di}"]`);
+    if (!col) return;
+    const row = col.querySelector('.day-name-row');
+    const existing = row.querySelector('.day-badge');
+    if (existing) existing.remove();
+    const dt = tasks[di] || [];
+    if (dt.length === 0) return;
+    const badge = el('span', 'day-badge');
+    const pending = dt.filter(t => !t.done).length;
+    badge.textContent = pending > 0 ? pending : dt.length;
+    row.appendChild(badge);
+  }
+
+  function reindex(di) {
+    const list = document.querySelector(`.task-list[data-day="${di}"]`);
+    if (!list) return;
+    list.querySelectorAll('.task-item').forEach((el, i) => { el.dataset.index = i; });
+  }
+
+  function emptyHint(today) {
+    const d = el('div', 'empty-hint');
+    d.textContent = today ? 'Nothing yet' : '–';
+    return d;
+  }
+
+  function el(tag, cls) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    return e;
+  }
+
+  function mkBtn(cls, svg, label) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = svg;
+    return b;
+  }
+
+  // ── Icons (inline SVG) ────────────────────────────────────────
+  function icoPlus() {
+    return `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true"><path d="M4.5 1v7M1 4.5h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  }
+  function icoGrip() {
+    return `<svg width="10" height="12" viewBox="0 0 10 12" fill="none" aria-hidden="true"><circle cx="3" cy="2.5" r="1" fill="currentColor"/><circle cx="7" cy="2.5" r="1" fill="currentColor"/><circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="7" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="9.5" r="1" fill="currentColor"/><circle cx="7" cy="9.5" r="1" fill="currentColor"/></svg>`;
+  }
+  function icoCheck() {
+    return `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M2 5.5L4.5 8L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function icoPen() {
+    return `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M1.5 9.5L3.5 7.5L8.5 2.5L8.5 2.5L8 2L3 7L1.5 9.5Z" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 2L9 4" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>`;
+  }
+  function icoX() {
+    return `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  }
+</script>
+</body>
+</html>
