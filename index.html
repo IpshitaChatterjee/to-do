@@ -79,6 +79,7 @@
       display: flex;
       flex-direction: column;
       border-right: 1px solid var(--border);
+      border-top: 2px solid transparent;
       background: var(--col-bg);
       overflow: hidden;
       position: relative;
@@ -88,19 +89,7 @@
 
     .day-col.is-today {
       background: var(--today-bg);
-    }
-
-    /* accent stripe — all columns reserve the same 2px so headers stay aligned */
-    .day-col::before {
-      content: '';
-      display: block;
-      height: 2px;
-      background: transparent;
-      flex-shrink: 0;
-    }
-
-    .day-col.is-today::before {
-      background: var(--accent);
+      border-top-color: var(--accent);
     }
 
     .day-col.drop-active {
