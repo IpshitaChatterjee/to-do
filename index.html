@@ -80,7 +80,7 @@
       justify-content: center;
       padding: 0;
       border-radius: 3px;
-      transition: background 0.12s, color 0.12s, opacity 0.15s;
+      transition: background 0.12s, color 0.12s, opacity 0.15s, transform 0.1s;
       flex-shrink: 0;
     }
     .nav-btn:hover:not(:disabled) {
@@ -104,7 +104,7 @@
       border-radius: 3px;
       padding: 0.2em 0.55em;
       cursor: pointer;
-      transition: background 0.12s, color 0.12s;
+      transition: background 0.12s, color 0.12s, transform 0.1s;
       display: none;
       align-items: center;
     }
@@ -192,6 +192,11 @@
       color: var(--accent);
     }
 
+    .day-badge.all-done {
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      color: var(--accent);
+    }
+
     .day-date {
       font-size: 0.66rem;
       font-weight: 300;
@@ -243,7 +248,11 @@
 
     .task-item:hover { background: color-mix(in srgb, var(--border) 38%, transparent); }
     .task-item:active { cursor: grabbing; }
-    .task-item.is-dragging { opacity: 0.28; }
+    .task-item.is-dragging {
+      opacity: 0.4;
+      transform: scale(0.97);
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
+    }
 
     /* drop line indicators */
     .task-item.drop-before::before,
@@ -321,7 +330,7 @@
       align-items: center;
       justify-content: center;
       padding: 0;
-      transition: background 0.1s, color 0.1s;
+      transition: background 0.1s, color 0.1s, transform 0.1s;
       flex-shrink: 0;
     }
     .t-btn:hover { background: var(--border); color: var(--text); }
@@ -334,6 +343,11 @@
       background: color-mix(in srgb, var(--delete) 12%, transparent);
       color: var(--delete);
     }
+
+    .t-btn:active { transform: scale(0.84); }
+    .add-btn:active { transform: scale(0.84); }
+    .nav-btn:active:not(:disabled) { transform: scale(0.84); }
+    .today-btn:active { transform: scale(0.94); }
 
     /* ── Add Area ────────────────────────────────────────────── */
 
@@ -378,7 +392,7 @@
       justify-content: center;
       padding: 0;
       flex-shrink: 0;
-      transition: background 0.14s, border-color 0.14s, color 0.14s;
+      transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.1s;
     }
     .add-btn:hover,
     .add-input:focus ~ .add-btn {
@@ -402,8 +416,47 @@
       animation: taskEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
+    @keyframes drawCheck {
+      from { stroke-dashoffset: 11; }
+      to   { stroke-dashoffset: 0; }
+    }
+    @keyframes doneConfirm {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.28); }
+      75%  { transform: scale(0.94); }
+      100% { transform: scale(1); }
+    }
+    .t-btn.btn-done.anim-check {
+      animation: doneConfirm 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .t-btn.btn-done.anim-check svg path {
+      stroke-dasharray: 11;
+      animation: drawCheck 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes colSlideRight {
+      from { opacity: 0; transform: translateX(18px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes colSlideLeft {
+      from { opacity: 0; transform: translateX(-18px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .day-col.slide-in-right {
+      animation: colSlideRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: calc(var(--col-index, 0) * 35ms);
+    }
+    .day-col.slide-in-left {
+      animation: colSlideLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: calc(var(--col-index, 0) * 35ms);
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .task-item.anim-enter { animation: none; }
+      .task-item.anim-enter,
+      .t-btn.btn-done.anim-check,
+      .t-btn.btn-done.anim-check svg path,
+      .day-col.slide-in-right,
+      .day-col.slide-in-left { animation: none; }
     }
 
     /* ── Responsive ──────────────────────────────────────────── */
@@ -564,6 +617,12 @@
     renderWeekRange();
     renderGrid();
     updateNavButtons();
+    const cls = dir > 0 ? 'slide-in-right' : 'slide-in-left';
+    document.querySelectorAll('.day-col').forEach((col, i) => {
+      col.style.setProperty('--col-index', i);
+      col.classList.add(cls);
+      col.addEventListener('animationend', () => col.classList.remove(cls), { once: true });
+    });
   }
 
   function updateNavButtons() {
@@ -600,7 +659,12 @@
     if (dtasks.length > 0) {
       const badge = el('span', 'day-badge');
       const pending = dtasks.filter(t => !t.done).length;
-      badge.textContent = pending > 0 ? pending : dtasks.length;
+      if (pending === 0) {
+        badge.textContent = '✓';
+        badge.classList.add('all-done');
+      } else {
+        badge.textContent = pending;
+      }
       nameRow.appendChild(badge);
     }
 
@@ -795,6 +859,10 @@
       const btn = item.querySelector('.btn-done');
       btn.classList.toggle('done-active', t.done);
       btn.setAttribute('aria-label', t.done ? 'Mark undone' : 'Mark done');
+      if (t.done) {
+        btn.classList.add('anim-check');
+        btn.addEventListener('animationend', () => btn.classList.remove('anim-check'), { once: true });
+      }
     }
     syncBadge(di);
   }
@@ -861,7 +929,12 @@
     if (dt.length === 0) return;
     const badge = el('span', 'day-badge');
     const pending = dt.filter(t => !t.done).length;
-    badge.textContent = pending > 0 ? pending : dt.length;
+    if (pending === 0) {
+      badge.textContent = '✓';
+      badge.classList.add('all-done');
+    } else {
+      badge.textContent = pending;
+    }
     row.appendChild(badge);
   }
 
