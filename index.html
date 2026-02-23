@@ -144,7 +144,10 @@
     }
 
     .day-col.drop-active {
-      background: color-mix(in srgb, var(--accent) 7%, var(--today-bg));
+      background: color-mix(in srgb, var(--accent) 8%, var(--col-bg));
+    }
+    .day-col.is-today.drop-active {
+      background: color-mix(in srgb, var(--accent) 8%, var(--today-bg));
     }
 
     /* ── Day Header ──────────────────────────────────────────── */
@@ -197,6 +200,11 @@
       color: var(--accent);
     }
 
+    .is-today .day-badge.all-done {
+      background: color-mix(in srgb, var(--accent) 26%, transparent);
+      font-weight: 600;
+    }
+
     .day-date {
       font-size: 0.66rem;
       font-weight: 300;
@@ -243,7 +251,7 @@
       cursor: grab;
       position: relative;
       min-width: 0;
-      transition: background 0.1s;
+      transition: background 0.1s, transform 0.12s;
     }
 
     .task-item:hover { background: color-mix(in srgb, var(--border) 38%, transparent); }
@@ -276,6 +284,7 @@
       color: var(--border);
       opacity: 0;
       transition: opacity 0.12s;
+      pointer-events: none;
     }
     .task-item:hover .drag-grip { opacity: 1; }
 
@@ -292,6 +301,7 @@
       padding: 0.05em 0.2em;
       margin: -0.05em -0.2em;
       cursor: text;
+      transition: color 0.2s, opacity 0.2s;
     }
 
     .task-text[contenteditable="true"] {
@@ -348,6 +358,14 @@
     .add-btn:active { transform: scale(0.84); }
     .nav-btn:active:not(:disabled) { transform: scale(0.84); }
     .today-btn:active { transform: scale(0.94); }
+
+    .t-btn:focus-visible,
+    .add-btn:focus-visible,
+    .nav-btn:focus-visible,
+    .today-btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent);
+    }
 
     /* ── Add Area ────────────────────────────────────────────── */
 
@@ -610,6 +628,7 @@
 
   // ── Navigation ────────────────────────────────────────────────
   function navigate(dir) {
+    if (dir === 0) return;
     if (dir < 0 && weekOffset === 0) return;
     weekOffset += dir;
     weekDates   = getWeekDates(weekOffset);
@@ -758,7 +777,8 @@
     textEl.textContent = task.text;
     textEl.addEventListener('click', () => {
       if (textEl.contentEditable === 'true') return;
-      beginEdit(textEl, task, di);
+      item.draggable = false;
+      beginEdit(textEl, task, di, item);
     });
 
     const actions = el('div', 'task-actions');
@@ -830,14 +850,16 @@
 
   function deleteTask(taskId, di, itemEl) {
     const h = itemEl.offsetHeight;
-    itemEl.style.cssText = `height:${h}px; overflow:hidden; transition:height 0.2s ease, opacity 0.15s ease, padding-top 0.2s ease, padding-bottom 0.2s ease;`;
+    itemEl.style.cssText = `height:${h}px; overflow:hidden; transition:height 0.2s ease, opacity 0.18s ease, padding-top 0.2s ease, padding-bottom 0.2s ease;`;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       itemEl.style.height        = '0';
       itemEl.style.opacity       = '0';
       itemEl.style.paddingTop    = '0';
       itemEl.style.paddingBottom = '0';
     }));
-    itemEl.addEventListener('transitionend', () => {
+    const onEnd = e => {
+      if (e.propertyName !== 'height') return;
+      itemEl.removeEventListener('transitionend', onEnd);
       tasks[di] = tasks[di].filter(t => t.id !== taskId);
       saveTasks();
       itemEl.remove();
@@ -845,7 +867,8 @@
       if (tasks[di].length === 0) list.appendChild(emptyHint(isToday(weekDates[di])));
       syncBadge(di);
       reindex(di);
-    }, { once: true });
+    };
+    itemEl.addEventListener('transitionend', onEnd);
   }
 
   function toggleDone(taskId, di) {
@@ -867,7 +890,7 @@
     syncBadge(di);
   }
 
-  function beginEdit(textEl, task, di) {
+  function beginEdit(textEl, task, di, itemEl) {
     textEl.contentEditable = 'true';
     textEl.focus();
     const sel = window.getSelection(), range = document.createRange();
@@ -878,13 +901,18 @@
     const finish = () => {
       const val = textEl.textContent.trim();
       textEl.contentEditable = 'false';
+      if (itemEl) itemEl.draggable = true;
       if (val) { task.text = val; saveTasks(); }
       else textEl.textContent = task.text;
     };
     textEl.addEventListener('blur', finish, { once: true });
     textEl.addEventListener('keydown', e => {
       if (e.key === 'Enter')  { e.preventDefault(); textEl.blur(); }
-      if (e.key === 'Escape') { textEl.textContent = task.text; textEl.contentEditable = 'false'; }
+      if (e.key === 'Escape') {
+        textEl.textContent = task.text;
+        textEl.contentEditable = 'false';
+        if (itemEl) itemEl.draggable = true;
+      }
     });
   }
 
@@ -923,19 +951,24 @@
     const col = document.querySelector(`.day-col[data-day="${di}"]`);
     if (!col) return;
     const row = col.querySelector('.day-name-row');
-    const existing = row.querySelector('.day-badge');
-    if (existing) existing.remove();
+    let badge = row.querySelector('.day-badge');
     const dt = tasks[di] || [];
-    if (dt.length === 0) return;
-    const badge = el('span', 'day-badge');
+    if (dt.length === 0) {
+      if (badge) badge.remove();
+      return;
+    }
+    if (!badge) {
+      badge = el('span', 'day-badge');
+      row.appendChild(badge);
+    }
     const pending = dt.filter(t => !t.done).length;
     if (pending === 0) {
       badge.textContent = '✓';
       badge.classList.add('all-done');
     } else {
       badge.textContent = pending;
+      badge.classList.remove('all-done');
     }
-    row.appendChild(badge);
   }
 
   function reindex(di) {
