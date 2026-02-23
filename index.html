@@ -54,12 +54,42 @@
       line-height: 1;
     }
 
+    .week-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
     .week-range {
       font-size: 0.7rem;
       font-weight: 300;
       color: var(--text-muted);
       letter-spacing: 0.07em;
       text-transform: uppercase;
+    }
+
+    .nav-btn {
+      width: 18px;
+      height: 18px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 3px;
+      transition: background 0.12s, color 0.12s, opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--border);
+      color: var(--text);
+    }
+    .nav-btn:disabled {
+      opacity: 0.25;
+      cursor: default;
     }
 
     /* ── Grid ────────────────────────────────────────────────── */
@@ -366,7 +396,15 @@
 
 <header class="app-header">
   <h1 class="app-title">Week</h1>
-  <span class="week-range" id="weekRange"></span>
+  <div class="week-nav">
+    <button class="nav-btn" id="prevBtn" aria-label="Previous week" disabled>
+      <svg width="7" height="11" viewBox="0 0 7 11" fill="none" aria-hidden="true"><path d="M6 1L1.5 5.5L6 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <span class="week-range" id="weekRange"></span>
+    <button class="nav-btn" id="nextBtn" aria-label="Next week">
+      <svg width="7" height="11" viewBox="0 0 7 11" fill="none" aria-hidden="true"><path d="M1 1L5.5 5.5L1 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
 </header>
 
 <div class="week-grid" id="weekGrid"></div>
@@ -377,27 +415,42 @@
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   // ── State ─────────────────────────────────────────────────────
-  let tasks     = loadTasks();
-  let dragState = null;
-  const weekDates = getWeekDates();
+  let weekOffset = 0;
+  let weekDates  = getWeekDates(0);
+  let dragState  = null;
+  let allTasks   = loadAllTasks();
+
+  // tasks is always a live reference to the current week's data
+  let tasks = getWeekTasks(0);
 
   // ── Boot ──────────────────────────────────────────────────────
+  checkRollover();
+  tasks = getWeekTasks(0); // refresh after potential rollover
   renderWeekRange();
   renderGrid();
+  updateNavButtons();
+
+  document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
+  document.getElementById('nextBtn').addEventListener('click', () => navigate(+1));
 
   // ── Dates ─────────────────────────────────────────────────────
-  function getWeekDates() {
+  function getWeekDates(offset) {
     const today = new Date();
     const dow   = today.getDay();
     const diff  = dow === 0 ? -6 : 1 - dow;
     const mon   = new Date(today);
-    mon.setDate(today.getDate() + diff);
+    mon.setDate(today.getDate() + diff + offset * 7);
     mon.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(mon);
       d.setDate(mon.getDate() + i);
       return d;
     });
+  }
+
+  // Key = Monday's ISO date string, e.g. "2026-02-23"
+  function getWeekKey(offset) {
+    return getWeekDates(offset)[0].toISOString().slice(0, 10);
   }
 
   function isToday(d) {
@@ -416,16 +469,82 @@
   }
 
   // ── Storage ───────────────────────────────────────────────────
-  function loadTasks() {
+  function loadAllTasks() {
     try {
-      const raw = localStorage.getItem('weekplan-v1');
+      // v2: week-keyed storage
+      const raw = localStorage.getItem('weekplan-v2');
       if (raw) return JSON.parse(raw);
+
+      // Migrate from v1 (day-indexed, no week context)
+      const v1 = localStorage.getItem('weekplan-v1');
+      if (v1) {
+        const migrated = { [getWeekKey(0)]: JSON.parse(v1) };
+        localStorage.setItem('weekplan-v2', JSON.stringify(migrated));
+        return migrated;
+      }
     } catch {}
-    return Object.fromEntries(Array.from({ length: 7 }, (_, i) => [i, []]));
+    return {};
   }
 
+  function saveAllTasks() {
+    localStorage.setItem('weekplan-v2', JSON.stringify(allTasks));
+  }
+
+  // Always call saveTasks() from task operations so allTasks stays in sync
   function saveTasks() {
-    localStorage.setItem('weekplan-v1', JSON.stringify(tasks));
+    allTasks[getWeekKey(weekOffset)] = tasks;
+    saveAllTasks();
+  }
+
+  function getWeekTasks(offset) {
+    const key = getWeekKey(offset);
+    if (!allTasks[key]) {
+      allTasks[key] = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [i, []]));
+    }
+    return allTasks[key];
+  }
+
+  // ── Rollover ──────────────────────────────────────────────────
+  // On load: if we're in a new calendar week vs last session,
+  // move all incomplete tasks from the old week → Monday of current week.
+  function checkRollover() {
+    const currentKey = getWeekKey(0);
+    const lastKey    = localStorage.getItem('weekplan-lastWeek');
+
+    if (lastKey && lastKey !== currentKey) {
+      const lastWeek = allTasks[lastKey];
+      if (lastWeek) {
+        const leftovers = [];
+        for (let d = 0; d < 7; d++) {
+          (lastWeek[d] || []).forEach(t => { if (!t.done) leftovers.push(t); });
+        }
+        if (leftovers.length > 0) {
+          if (!allTasks[currentKey]) {
+            allTasks[currentKey] = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [i, []]));
+          }
+          // Prepend to Monday (day 0) of current week
+          allTasks[currentKey][0] = [...leftovers, ...(allTasks[currentKey][0] || [])];
+          saveAllTasks();
+        }
+      }
+    }
+
+    localStorage.setItem('weekplan-lastWeek', currentKey);
+  }
+
+  // ── Navigation ────────────────────────────────────────────────
+  function navigate(dir) {
+    if (dir < 0 && weekOffset === 0) return;
+    weekOffset += dir;
+    weekDates   = getWeekDates(weekOffset);
+    tasks       = getWeekTasks(weekOffset);
+    renderWeekRange();
+    renderGrid();
+    updateNavButtons();
+  }
+
+  function updateNavButtons() {
+    document.getElementById('prevBtn').disabled = weekOffset === 0;
   }
 
   function uid() {
@@ -622,7 +741,6 @@
   }
 
   function deleteTask(taskId, di, itemEl) {
-    // Animate collapse
     const h = itemEl.offsetHeight;
     itemEl.style.cssText = `height:${h}px; overflow:hidden; transition:height 0.2s ease, opacity 0.15s ease, padding-top 0.2s ease, padding-bottom 0.2s ease;`;
     requestAnimationFrame(() => requestAnimationFrame(() => {
